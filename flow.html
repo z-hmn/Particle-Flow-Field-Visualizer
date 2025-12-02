@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Perlin Flow Field</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.min.js"></script>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      background: #0a0a0a;
+      color: #e0e0e0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      padding: 20px;
+    }
+    
+    .container {
+      display: flex;
+      gap: 30px;
+      max-width: 1200px;
+      width: 100%;
+      align-items: center;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+    
+    .canvas-container {
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+    }
+    
+    .controls {
+      background: #1a1a1a;
+      padding: 30px;
+      border-radius: 12px;
+      min-width: 280px;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+    }
+    
+    h1 {
+      font-size: 24px;
+      font-weight: 600;
+      margin-bottom: 24px;
+      color: #ffffff;
+      letter-spacing: -0.5px;
+    }
+    
+    .control-group {
+      margin-bottom: 24px;
+    }
+    
+    label {
+      display: block;
+      font-size: 13px;
+      font-weight: 500;
+      margin-bottom: 8px;
+      color: #b0b0b0;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    
+    .value-display {
+      float: right;
+      color: #ffffff;
+      font-weight: 600;
+    }
+    
+    input[type="range"] {
+      width: 100%;
+      height: 6px;
+      border-radius: 3px;
+      background: #2a2a2a;
+      outline: none;
+      -webkit-appearance: none;
+      cursor: pointer;
+    }
+    
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: #ffffff;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    
+    input[type="range"]::-webkit-slider-thumb:hover {
+      transform: scale(1.2);
+      background: #f0f0f0;
+    }
+    
+    input[type="range"]::-moz-range-thumb {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: #ffffff;
+      cursor: pointer;
+      border: none;
+      transition: all 0.2s ease;
+    }
+    
+    input[type="range"]::-moz-range-thumb:hover {
+      transform: scale(1.2);
+      background: #f0f0f0;
+    }
+    
+    button {
+      width: 100%;
+      padding: 12px;
+      background: #2a2a2a;
+      color: #ffffff;
+      border: none;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    
+    button:hover {
+      background: #3a3a3a;
+      transform: translateY(-1px);
+    }
+    
+    button:active {
+      transform: translateY(0);
+    }
+    
+    @media (max-width: 768px) {
+      .container {
+        flex-direction: column;
+      }
+      
+      .controls {
+        width: 100%;
+        max-width: 400px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="canvas-container" id="canvas-holder"></div>
+    
+    <div class="controls">
+      <h1>Flow Field</h1>
+      
+      <div class="control-group">
+        <label>
+          Particles
+          <span class="value-display" id="particles-value">500</span>
+        </label>
+        <input type="range" id="particles" min="50" max="2000" value="500" step="50">
+      </div>
+      
+      <div class="control-group">
+        <label>
+          Noise Scale
+          <span class="value-display" id="noise-value">0.002</span>
+        </label>
+        <input type="range" id="noise" min="0.0005" max="0.01" value="0.002" step="0.0005">
+      </div>
+      
+      <div class="control-group">
+        <label>
+          Speed
+          <span class="value-display" id="speed-value">2</span>
+        </label>
+        <input type="range" id="speed" min="0.5" max="5" value="2" step="0.1">
+      </div>
+      
+      <button id="reset">Reset Canvas</button>
+    </div>
+  </div>
+
+  <script>
+    let particles = [];
+    let numParticles = 500;
+    let noiseScaleP = 0.002;
+    let speed = 2;
+    
+    function setup() {
+      let canvas = createCanvas(600, 600);
+      canvas.parent('canvas-holder');
+      background(0);
+      
+      for (let i = 0; i < numParticles; i++) {
+        particles.push(new Particle());
+      }
+    }
+    
+    function draw() {
+      fill(0, 15);
+      rect(0, 0, width, height);
+      
+      for (let p of particles) {
+        p.update();
+        p.show();
+      }
+    }
+    
+    class Particle {
+      constructor() {
+        this.pos = createVector(random(width), random(height));
+        this.prev = this.pos.copy();
+        this.col = color(random(150, 255), random(150, 255), random(150, 255));
+      }
+      
+      update() {
+        let n = noise(this.pos.x * noiseScaleP, this.pos.y * noiseScaleP, frameCount * 0.002);
+        let angle = n * TWO_PI * 4;
+        let vel = p5.Vector.fromAngle(angle);
+        vel.mult(speed);
+        this.prev = this.pos.copy();
+        this.pos.add(vel);
+        
+        if (this.pos.x < 0 || this.pos.x > width || this.pos.y < 0 || this.pos.y > height) {
+          this.pos = createVector(random(width), random(height));
+          this.prev = this.pos.copy();
+        }
+      }
+      
+      show() {
+        stroke(this.col);
+        strokeWeight(1.2);
+        line(this.prev.x, this.prev.y, this.pos.x, this.pos.y);
+      }
+    }
+    
+    // Control handlers
+    document.getElementById('particles').addEventListener('input', (e) => {
+      let newNum = parseInt(e.target.value);
+      document.getElementById('particles-value').textContent = newNum;
+      
+      if (newNum > numParticles) {
+        for (let i = 0; i < newNum - numParticles; i++) {
+          particles.push(new Particle());
+        }
+      } else if (newNum < numParticles) {
+        particles.splice(newNum);
+      }
+      numParticles = newNum;
+    });
+    
+    document.getElementById('noise').addEventListener('input', (e) => {
+      noiseScaleP = parseFloat(e.target.value);
+      document.getElementById('noise-value').textContent = noiseScaleP.toFixed(4);
+    });
+    
+    document.getElementById('speed').addEventListener('input', (e) => {
+      speed = parseFloat(e.target.value);
+      document.getElementById('speed-value').textContent = speed.toFixed(1);
+    });
+    
+    document.getElementById('reset').addEventListener('click', () => {
+      background(0);
+      particles = [];
+      for (let i = 0; i < numParticles; i++) {
+        particles.push(new Particle());
+      }
+    });
+  </script>
+</body>
+</html>
